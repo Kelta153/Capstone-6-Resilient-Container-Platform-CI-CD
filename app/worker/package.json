@@ -1,0 +1,11 @@
+{
+  "name": "resilient-platform-worker",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.879.0"
+  }
+}
