@@ -32,7 +32,7 @@ phases:
 
       - echo Building infrastructure...
       - npm run build --prefix infrastructure
-      - npx cdk synth --app "npx tsx bin/infrastructure.ts" --prefix infrastructure
+      - cd infrastructure && npx cdk synth
 
 artifacts:
   files:
