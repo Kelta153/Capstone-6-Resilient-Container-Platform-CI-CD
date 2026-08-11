@@ -1,39 +1,35 @@
 version: 0.2
 
 phases:
-  install:
-    runtime-versions:
-      nodejs: 22
-    commands:
-      - npm ci --prefix app/web
-      - npm ci --prefix app/worker
-      - npm ci --prefix infrastructure
-
   pre_build:
     commands:
       - echo Logging in to Amazon ECR...
-      - AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - AWS_REGION=${AWS_DEFAULT_REGION}
-      - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+      - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com"
 
   build:
     commands:
-      - echo Building web image...
-      - docker build -t resilient-platform-web ./app/web
-      - docker tag resilient-platform-web:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/resilient-platform-web:latest
+      - echo Building web Docker image...
+      - docker build -t "$WEB_REPOSITORY_URI:latest" ./app/web
 
-      - echo Building worker image...
-      - docker build -t resilient-platform-worker ./app/worker
-      - docker tag resilient-platform-worker:latest $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/resilient-platform-worker:latest
+      - echo Building worker Docker image...
+      - docker build -t "$WORKER_REPOSITORY_URI:latest" ./app/worker
 
-      - echo Pushing images to ECR...
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/resilient-platform-web:latest
-      - docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/resilient-platform-worker:latest
+  post_build:
+    commands:
+      - echo Pushing web image to ECR...
+      - docker push "$WEB_REPOSITORY_URI:latest"
 
-      - echo Building infrastructure...
-      - npm run build --prefix infrastructure
-      - cd infrastructure && npx cdk synth
+      - echo Pushing worker image to ECR...
+      - docker push "$WORKER_REPOSITORY_URI:latest"
+
+      - echo Updating web ECS service...
+      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$WEB_SERVICE" --force-new-deployment
+
+      - echo Updating worker ECS service...
+      - aws ecs update-service --cluster "$ECS_CLUSTER" --service "$WORKER_SERVICE" --force-new-deployment
+
+      - echo CI/CD deployment completed successfully.
 
 artifacts:
   files:
-    - infrastructure/cdk.out/**/*
+    - "**/*"
