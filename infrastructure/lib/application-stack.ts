@@ -5,6 +5,8 @@ import * as ecs from "aws-cdk-lib/aws-ecs";
 import * as elbv2 from "aws-cdk-lib/aws-elasticloadbalancingv2";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as rds from "aws-cdk-lib/aws-rds";
+import * as cloudwatch from "aws-cdk-lib/aws-cloudwatch";
+import * as appscaling from "aws-cdk-lib/aws-applicationautoscaling";
 
 interface ApplicationStackProps extends cdk.StackProps {
   vpc: ec2.IVpc;
@@ -188,6 +190,85 @@ export class ApplicationStack extends cdk.Stack {
     });
 
     this.workerServiceName = workerService.serviceName;
+
+    /*
+     * Worker Auto Scaling
+     *
+     * The worker service scales according to SQS queue depth.
+     */
+    const workerScaling = workerService.autoScaleTaskCount({
+      minCapacity: 1,
+      maxCapacity: 5,
+    });
+
+    /*
+     * SQS messages visible
+     */
+    const visibleMessagesMetric =
+      this.queue.metricApproximateNumberOfMessagesVisible({
+        period: cdk.Duration.minutes(1),
+        statistic: "Average",
+      });
+
+    /*
+     * Target tracking metric:
+     *
+     * SQS messages / desired worker tasks
+     *
+     * This represents the approximate number of messages
+     * assigned to each worker.
+     */
+    const messagesPerWorkerMetric = new cloudwatch.MathExpression({
+      expression: "messages / workers",
+      usingMetrics: {
+        messages: visibleMessagesMetric,
+        workers: new cloudwatch.Metric({
+          namespace: "ECS/ContainerInsights",
+          metricName: "DesiredTaskCount",
+          dimensionsMap: {
+            ClusterName: props.cluster.clusterName,
+            ServiceName: workerService.serviceName,
+          },
+          statistic: "Average",
+          period: cdk.Duration.minutes(1),
+        }),
+      },
+      period: cdk.Duration.minutes(1),
+    });
+
+    /*
+     * Target tracking:
+     *
+     * Maintain approximately 5 SQS messages per worker.
+     */
+    workerScaling.scaleOnMetric("WorkerQueueScaling", {
+      metric: messagesPerWorkerMetric,
+
+      scalingSteps: [
+        {
+          upper: 5,
+          change: 0,
+        },
+        {
+          lower: 5,
+          change: 1,
+        },
+        {
+          lower: 10,
+          change: 1,
+        },
+        {
+          lower: 20,
+          change: 2,
+        },
+      ],
+
+      adjustmentType: appscaling.AdjustmentType.CHANGE_IN_CAPACITY,
+
+      cooldown: cdk.Duration.minutes(1),
+
+      evaluationPeriods: 2,
+    });
 
     /*
      * SQS permissions

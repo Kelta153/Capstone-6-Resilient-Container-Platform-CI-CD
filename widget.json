@@ -1,0 +1,27 @@
+{
+  "title": "Worker Task Count vs SQS Backlog Scaling",
+  "view": "timeSeries",
+  "stacked": false,
+  "period": 60,
+  "region": "us-east-1",
+  "start": "2026-08-13T19:30:00Z",
+  "end": "2026-08-13T20:45:00Z",
+  "metrics": [
+    [
+      "ECS/ContainerInsights",
+      "DesiredTaskCount",
+      "ClusterName",
+      "resilient-platform-cluster",
+      "ServiceName",
+      "ApplicationStack-WorkerService99815FA9-hiMa228qcXH3"
+    ],
+    [
+      "ECS/ContainerInsights",
+      "RunningTaskCount",
+      "ClusterName",
+      "resilient-platform-cluster",
+      "ServiceName",
+      "ApplicationStack-WorkerService99815FA9-hiMa228qcXH3"
+    ]
+  ]
+}

@@ -9,6 +9,8 @@ import { ComputeStack } from "../lib/compute-stack";
 import { DatabaseStack } from "../lib/database-stack";
 import { ApplicationStack } from "../lib/application-stack";
 import { PipelineStack } from "../lib/pipeline-stack";
+import { BackupStack } from "../lib/backup-stack";
+import { Route53Stack } from "../lib/route53-stack";
 
 const app = new cdk.App();
 
@@ -29,6 +31,21 @@ const computeStack = new ComputeStack(app, "ComputeStack", {
 const databaseStack = new DatabaseStack(app, "DatabaseStack", {
   env,
   vpc: networkStack.vpc,
+});
+
+const backupStack = new BackupStack(app, "BackupStack", {
+  env,
+  database: databaseStack.database,
+});
+
+const route53Stack = new Route53Stack(app, "Route53Stack", {
+  env,
+
+  vpc: networkStack.vpc,
+
+  loadBalancer: computeStack.loadBalancer,
+
+  targetGroup: computeStack.targetGroup,
 });
 
 /*
